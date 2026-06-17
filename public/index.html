@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inventory Scraper</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0f1117;
+      --surface:   #181c27;
+      --border:    #252a38;
+      --amber:     #f59e0b;
+      --amber-dim: #92400e;
+      --green:     #10b981;
+      --red:       #ef4444;
+      --blue:      #3b82f6;
+      --text:      #e2e8f0;
+      --muted:     #64748b;
+      --mono:      'JetBrains Mono', monospace;
+      --sans:      'Inter', sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ───────────────────────────────────────── */
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 18px 32px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .logo-mark {
+      width: 32px; height: 32px;
+      background: var(--amber);
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .logo-mark svg { width: 18px; height: 18px; fill: #000; }
+    header h1 { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+    header span { font-size: 13px; color: var(--muted); margin-left: 4px; }
+
+    /* ── Layout ───────────────────────────────────────── */
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 0;
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 32px 32px 32px 32px;
+      gap: 24px;
+    }
+
+    /* ── Cards ────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 24px;
+    }
+    .card-title {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    /* ── Upload zone ──────────────────────────────────── */
+    .upload-zone {
+      border: 1.5px dashed var(--border);
+      border-radius: 8px;
+      padding: 32px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      position: relative;
+    }
+    .upload-zone:hover, .upload-zone.drag { border-color: var(--amber); background: rgba(245,158,11,0.04); }
+    .upload-zone input[type=file] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    .upload-icon { margin-bottom: 10px; }
+    .upload-icon svg { width: 32px; height: 32px; stroke: var(--muted); }
+    .upload-zone p { font-size: 13px; color: var(--muted); line-height: 1.5; }
+    .upload-zone strong { color: var(--text); font-weight: 500; }
+    #file-name {
+      margin-top: 10px;
+      font-size: 12px;
+      font-family: var(--mono);
+      color: var(--amber);
+      min-height: 16px;
+    }
+
+    /* ── Config section ───────────────────────────────── */
+    .config-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .config-row:last-child { border-bottom: none; }
+    .config-label { color: var(--muted); }
+    .config-val {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--amber);
+      background: rgba(245,158,11,0.08);
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    /* ── Run button ───────────────────────────────────── */
+    #run-btn {
+      width: 100%;
+      margin-top: 20px;
+      padding: 12px;
+      background: var(--amber);
+      color: #000;
+      font-family: var(--sans);
+      font-size: 14px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    #run-btn:hover:not(:disabled) { opacity: 0.9; }
+    #run-btn:active:not(:disabled) { transform: scale(0.99); }
+    #run-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Progress bar ─────────────────────────────────── */
+    .progress-wrap { margin-top: 16px; display: none; }
+    .progress-wrap.visible { display: block; }
+    .progress-meta {
+      display: flex; justify-content: space-between;
+      font-size: 12px; color: var(--muted); margin-bottom: 6px;
+    }
+    .progress-bar-bg {
+      background: var(--border);
+      border-radius: 99px;
+      height: 4px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--amber);
+      border-radius: 99px;
+      transition: width 0.4s ease;
+      width: 0%;
+    }
+
+    /* ── Right panel ──────────────────────────────────── */
+    .right-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* ── Log feed ─────────────────────────────────────── */
+    #log-feed {
+      flex: 1;
+      min-height: 280px;
+      max-height: 340px;
+      overflow-y: auto;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.7;
+      padding: 4px 0;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+    .log-line { display: flex; gap: 10px; padding: 1px 0; }
+    .log-ts { color: var(--muted); flex-shrink: 0; }
+    .log-msg { color: var(--text); word-break: break-all; }
+    .log-msg.warn  { color: #fbbf24; }
+    .log-msg.error { color: var(--red); }
+    .log-msg.done  { color: var(--green); font-weight: 500; }
+    .log-empty { color: var(--muted); font-size: 13px; padding: 40px 0; text-align: center; }
+
+    /* ── Results table ────────────────────────────────── */
+    #results-section { display: none; }
+    #results-section.visible { display: block; }
+
+    .results-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    #dl-all-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      background: transparent;
+      border: 1px solid var(--amber);
+      color: var(--amber);
+      font-family: var(--sans);
+      font-size: 12px;
+      font-weight: 500;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    #dl-all-btn:hover { background: rgba(245,158,11,0.08); }
+    #dl-all-btn svg { width: 14px; height: 14px; stroke: currentColor; }
+
+    .results-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .results-table th {
+      text-align: left;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--muted);
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .results-table td {
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+      vertical-align: middle;
+    }
+    .results-table tr:last-child td { border-bottom: none; }
+    .results-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 99px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+    .badge-new  { background: rgba(59,130,246,0.15); color: #93c5fd; }
+    .badge-used { background: rgba(16,185,129,0.15); color: #6ee7b7; }
+    .badge-log  { background: rgba(100,116,139,0.15); color: #94a3b8; }
+
+    .dl-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--text);
+      font-size: 11px;
+      font-family: var(--sans);
+      cursor: pointer;
+      text-decoration: none;
+      transition: border-color 0.1s, color 0.1s;
+    }
+    .dl-btn:hover { border-color: var(--amber); color: var(--amber); }
+    .dl-btn svg { width: 12px; height: 12px; stroke: currentColor; }
+
+    /* ── Stats row ────────────────────────────────────── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    .stat-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      text-align: center;
+    }
+    .stat-num {
+      font-size: 24px;
+      font-weight: 600;
+      font-family: var(--mono);
+      color: var(--amber);
+      line-height: 1;
+    }
+    .stat-label { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+    /* ── Responsive ───────────────────────────────────── */
+    @media (max-width: 800px) {
+      main { grid-template-columns: 1fr; padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo-mark">
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M19 17H5c-1.1 0-2-.9-2-2V9c0-1.1.9-2 2-2h14c1.1 0 2 .9 2 2v6c0 1.1-.9 2-2 2zM7 13a2 2 0 110-4 2 2 0 010 4zm10 0a2 2 0 110-4 2 2 0 010 4z"/>
+    </svg>
+  </div>
+  <h1>Inventory Scraper <span>— Jenkins Auto Group</span></h1>
+</header>
+
+<main>
+
+  <!-- ── LEFT: Upload + Config ── -->
+  <div style="display:flex;flex-direction:column;gap:20px;">
+
+    <!-- Upload -->
+    <div class="card">
+      <p class="card-title">1 — Upload rooftop CSV</p>
+      <div class="upload-zone" id="drop-zone">
+        <input type="file" id="csv-input" accept=".csv" />
+        <div class="upload-icon">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 16V4m0 0l-4 4m4-4l4 4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M3 20h18" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <p><strong>Drop CSV here</strong> or click to browse</p>
+        <p style="margin-top:4px;font-size:11px;">Needs: Enterprise_Name, Rooftop_Name, New_url, used_url</p>
+        <div id="file-name"></div>
+      </div>
+    </div>
+
+    <!-- Config -->
+    <div class="card">
+      <p class="card-title">2 — Configuration</p>
+      <div class="config-row">
+        <span class="config-label">Parallel rooftops</span>
+        <span class="config-val">3</span>
+      </div>
+      <div class="config-row">
+        <span class="config-label">Page delay</span>
+        <span class="config-val">0.2s</span>
+      </div>
+      <div class="config-row">
+        <span class="config-label">Platforms</span>
+        <span class="config-val">DDC · DealerOn</span>
+      </div>
+      <div class="config-row">
+        <span class="config-label">Rate limit retries</span>
+        <span class="config-val">5 × backoff</span>
+      </div>
+
+      <button id="run-btn" disabled>Start Scraping</button>
+
+      <div class="progress-wrap" id="progress-wrap">
+        <div class="progress-meta">
+          <span id="progress-label">Starting…</span>
+          <span id="progress-pct">0%</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="progress-fill"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row" id="stats-row" style="display:none;">
+      <div class="stat-box">
+        <div class="stat-num" id="stat-rooftops">0</div>
+        <div class="stat-label">Rooftops</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num" id="stat-new">0</div>
+        <div class="stat-label">New VINs</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num" id="stat-used">0</div>
+        <div class="stat-label">Used VINs</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── RIGHT: Log + Results ── -->
+  <div class="right-panel">
+
+    <!-- Live log -->
+    <div class="card" style="flex:1;">
+      <p class="card-title">Live log</p>
+      <div id="log-feed">
+        <div class="log-empty" id="log-empty">Upload a CSV and click Start to begin.</div>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div class="card" id="results-section">
+      <div class="results-header">
+        <p class="card-title" style="margin-bottom:0;">3 — Download results</p>
+        <button id="dl-all-btn">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M12 4v12m0 0l-4-4m4 4l4-4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 20h18" stroke-width="1.5" stroke-linecap="round"/></svg>
+          Download all (.zip)
+        </button>
+      </div>
+      <table class="results-table">
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Type</th>
+            <th>Rows</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="results-tbody"></tbody>
+      </table>
+    </div>
+
+  </div>
+</main>
+
+<script>
+  const API = '';  // same origin — change to 'http://localhost:8000' for local dev
+
+  const csvInput    = document.getElementById('csv-input');
+  const dropZone    = document.getElementById('drop-zone');
+  const fileNameEl  = document.getElementById('file-name');
+  const runBtn      = document.getElementById('run-btn');
+  const logFeed     = document.getElementById('log-feed');
+  const logEmpty    = document.getElementById('log-empty');
+  const progressWrap= document.getElementById('progress-wrap');
+  const progressFill= document.getElementById('progress-fill');
+  const progressLbl = document.getElementById('progress-label');
+  const progressPct = document.getElementById('progress-pct');
+  const resultsSection = document.getElementById('results-section');
+  const resultsTbody   = document.getElementById('results-tbody');
+  const dlAllBtn    = document.getElementById('dl-all-btn');
+  const statsRow    = document.getElementById('stats-row');
+
+  let selectedFile = null;
+  let eventSource  = null;
+
+  // ── File selection ────────────────────────────────────────────────────
+  csvInput.addEventListener('change', e => setFile(e.target.files[0]));
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag');
+    const f = e.dataTransfer.files[0];
+    if (f && f.name.endsWith('.csv')) setFile(f);
+  });
+
+  function setFile(f) {
+    if (!f) return;
+    selectedFile  = f;
+    fileNameEl.textContent = f.name;
+    runBtn.disabled = false;
+  }
+
+  // ── Start scrape ──────────────────────────────────────────────────────
+  runBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+
+    // Reset UI
+    logFeed.innerHTML = '';
+    logEmpty.style.display = 'none';
+    resultsSection.classList.remove('visible');
+    statsRow.style.display = 'none';
+    progressWrap.classList.add('visible');
+    progressFill.style.width = '0%';
+    progressLbl.textContent = 'Starting…';
+    progressPct.textContent = '0%';
+    runBtn.disabled = true;
+    runBtn.textContent = 'Running…';
+
+    const fd = new FormData();
+    fd.append('file', selectedFile);
+
+    try {
+      const res = await fetch(`${API}/api/scrape`, { method: 'POST', body: fd });
+      if (!res.ok) {
+        const err = await res.json();
+        appendLog(`Error: ${err.detail}`, 'error');
+        runBtn.disabled = false;
+        runBtn.textContent = 'Start Scraping';
+        return;
+      }
+      const data = await res.json();
+      appendLog(`Job started — ${data.total} rooftops queued`);
+      startEventStream();
+    } catch (e) {
+      appendLog(`Network error: ${e.message}`, 'error');
+      runBtn.disabled = false;
+      runBtn.textContent = 'Start Scraping';
+    }
+  });
+
+  // ── SSE progress stream ───────────────────────────────────────────────
+  function startEventStream() {
+    if (eventSource) eventSource.close();
+    eventSource = new EventSource(`${API}/api/progress`);
+
+    eventSource.onmessage = e => {
+      const d = JSON.parse(e.data);
+      if (d.msg === '__done__') {
+        eventSource.close();
+        onComplete(d.total);
+        return;
+      }
+      appendLog(d.msg, d.level);
+      if (d.total > 0) updateProgress(d.done, d.total);
+    };
+
+    eventSource.onerror = () => {
+      eventSource.close();
+      appendLog('Connection lost — check if the server is running.', 'error');
+      runBtn.disabled = false;
+      runBtn.textContent = 'Start Scraping';
+    };
+  }
+
+  function updateProgress(done, total) {
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    progressFill.style.width = pct + '%';
+    progressPct.textContent  = pct + '%';
+    progressLbl.textContent  = `${done} / ${total} rooftops`;
+  }
+
+  async function onComplete(total) {
+    updateProgress(total, total);
+    progressLbl.textContent = 'Complete';
+    runBtn.disabled = false;
+    runBtn.textContent = 'Start Scraping';
+    await loadResults();
+  }
+
+  // ── Log helper ────────────────────────────────────────────────────────
+  function appendLog(msg, level = 'info') {
+    const ts  = new Date().toLocaleTimeString('en-US', { hour12: false });
+    const row = document.createElement('div');
+    row.className = 'log-line';
+    row.innerHTML = `<span class="log-ts">${ts}</span><span class="log-msg ${level}">${escHtml(msg)}</span>`;
+    logFeed.appendChild(row);
+    logFeed.scrollTop = logFeed.scrollHeight;
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ── Load & render results ─────────────────────────────────────────────
+  async function loadResults() {
+    const res  = await fetch(`${API}/api/results`);
+    const data = await res.json();
+    const files = data.files || [];
+
+    if (!files.length) return;
+
+    resultsTbody.innerHTML = '';
+    let totalNew = 0, totalUsed = 0, rooftops = new Set();
+
+    files.forEach(f => {
+      const isLog  = f.name === 'run_log.csv';
+      const isNew  = f.name.endsWith('_new.csv');
+      const isUsed = f.name.endsWith('_used.csv');
+
+      const badge = isLog  ? '<span class="badge badge-log">log</span>'
+                  : isNew  ? '<span class="badge badge-new">new</span>'
+                  : isUsed ? '<span class="badge badge-used">used</span>'
+                  : '';
+
+      if (isNew)  { totalNew  += f.rows; rooftops.add(f.name.replace('_new.csv',''));  }
+      if (isUsed) { totalUsed += f.rows; rooftops.add(f.name.replace('_used.csv','')); }
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="font-family:var(--mono);font-size:11px;">${escHtml(f.name)}</td>
+        <td>${badge}</td>
+        <td style="color:var(--muted);">${f.rows.toLocaleString()}</td>
+        <td>
+          <a class="dl-btn" href="${API}/api/download/${encodeURIComponent(f.name)}" download="${f.name}">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M12 4v12m0 0l-4-4m4 4l4-4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 20h18" stroke-width="1.5" stroke-linecap="round"/></svg>
+            Download
+          </a>
+        </td>
+      `;
+      resultsTbody.appendChild(tr);
+    });
+
+    // Stats
+    document.getElementById('stat-rooftops').textContent = rooftops.size;
+    document.getElementById('stat-new').textContent      = totalNew.toLocaleString();
+    document.getElementById('stat-used').textContent     = totalUsed.toLocaleString();
+    statsRow.style.display = 'grid';
+
+    resultsSection.classList.add('visible');
+  }
+
+  // ── Download all ──────────────────────────────────────────────────────
+  dlAllBtn.addEventListener('click', () => {
+    window.location.href = `${API}/api/download-all`;
+  });
+</script>
+</body>
+</html>
